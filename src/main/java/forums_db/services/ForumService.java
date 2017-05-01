@@ -71,7 +71,7 @@ public class ForumService {
         final List<Object> arguments = new ArrayList<>();
         arguments.add(slug);
 
-        if(since != null) {
+        if (since != null) {
             query.append(" AND created ");
             if (desc == Boolean.TRUE) {
                 query.append("<= ?");
@@ -95,6 +95,13 @@ public class ForumService {
 
     }
 
+    public List<ThreadModel> getThread(String slug) {
+        final String query = "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title " +
+                        "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
+                        "JOIN forum f ON (t.forum_id = f.id) " +
+                        "WHERE LOWER(t.slug) = LOWER(?)";
+        return jdbcTemplate.query(query, new Object[]{slug}, ThreadService::rowMapper);
+    }
 
 
     private static ForumModel rowMapper(ResultSet set, int rowNumber) throws SQLException {

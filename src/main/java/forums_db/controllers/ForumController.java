@@ -58,6 +58,9 @@ public class ForumController {
         if (body.getSlug() == null) {
             body.setSlug(slug);
         }
+        if (body.getForum() == null) {
+            body.setForum(slug);
+        }
         if (body.getCreated() == null) {
             body.setCreated(LocalDateTime.now().toString());
         }
@@ -69,8 +72,9 @@ public class ForumController {
                 throw new EmptyResultDataAccessException(0);
             }
         } catch (DuplicateKeyException e) {
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
-        } catch (EmptyResultDataAccessException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(forumService.getThread(body.getSlug()).get(0));
+
+        } catch (DataAccessException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
