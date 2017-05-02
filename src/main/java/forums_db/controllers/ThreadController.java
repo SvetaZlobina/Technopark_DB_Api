@@ -5,6 +5,7 @@ import forums_db.models.ThreadModel;
 import forums_db.models.VoteModel;
 import forums_db.services.ThreadService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
@@ -64,6 +65,22 @@ public class ThreadController {
         } catch (EmptyResultDataAccessException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
+        return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
+    }
+
+    @GetMapping(path = "/details")
+    public ResponseEntity<?> getThread(@PathVariable("slug") String slug) {
+        final List<ThreadModel> threads;
+
+        try {
+            threads = threadService.getThread(slug);
+            if(threads.isEmpty()) {
+                throw new EmptyResultDataAccessException(0);
+            }
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
         return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
     }
 
