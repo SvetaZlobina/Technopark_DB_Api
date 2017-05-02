@@ -14,7 +14,7 @@ public class ThreadModel {
     private String message;
     private String slug;
     private String title;
-    //private Integer votes;
+    private Integer votes;
 
     @JsonCreator
     public ThreadModel(@JsonProperty("author") String author,
@@ -23,8 +23,8 @@ public class ThreadModel {
                        @JsonProperty("id") Integer id,
                        @JsonProperty("message") String message,
                        @JsonProperty("slug") String slug,
-                       @JsonProperty("title") String title
-                       /*@JsonProperty("votes") Integer votes*/) {
+                       @JsonProperty("title") String title,
+                       @JsonProperty("votes") Integer votes) {
         this.author = author;
         this.created = created;
         this.forum = forum;
@@ -32,7 +32,7 @@ public class ThreadModel {
         this.message = message;
         this.slug = slug;
         this.title = title;
-        //this.votes = votes;
+        this.votes = votes;
     }
 
     public String getAuthor() {
@@ -63,9 +63,9 @@ public class ThreadModel {
         return this.title;
     }
 
-//    public Integer getVotes() {
-//        return this.votes;
-//    }
+    public Integer getVotes() {
+        return this.votes;
+    }
 
     public void setAuthor(String author) {
         this.author = author;
@@ -89,7 +89,7 @@ public class ThreadModel {
         this.title = title;
     }
 
-//    public void setVotes(Integer votes) {
-//        this.votes = votes;
-//    }
+    public void setVotes(Integer votes) {
+        this.votes = votes;
+    }
 }

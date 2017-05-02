@@ -56,7 +56,7 @@ public class ForumService {
                 thread.getMessage(), thread.getSlug(), thread.getTitle());
 
         return jdbcTemplate.query(
-                "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.title, t.slug " +
+                "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.title, t.slug, t.votes " +
                         "FROM thread t JOIN \"user\" u ON (t.user_id = u.id) JOIN forum f ON (t.forum_id = f.id) " +
                         "WHERE LOWER(t.slug) = LOWER(?)",
                 new Object[]{thread.getSlug()},
@@ -64,7 +64,7 @@ public class ForumService {
     }
 
     public List<ThreadModel> getThreads(String slug, Integer limit, String since, Boolean desc) {
-        final StringBuilder query = new StringBuilder("SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title " +
+        final StringBuilder query = new StringBuilder("SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title, t.votes " +
                 "FROM thread t JOIN \"user\" u ON (t.user_id = u.id) " +
                 "JOIN forum f ON (t.forum_id = f.id) " +
                 "WHERE LOWER(f.slug) = LOWER(?)");
@@ -96,7 +96,7 @@ public class ForumService {
     }
 
     public List<ThreadModel> getThread(String slug) {
-        final String query = "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title " +
+        final String query = "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title, t.votes " +
                         "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
                         "JOIN forum f ON (t.forum_id = f.id) " +
                         "WHERE LOWER(t.slug) = LOWER(?)";

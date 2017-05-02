@@ -2,6 +2,7 @@ package forums_db.services;
 
 import forums_db.models.PostModel;
 import forums_db.models.ThreadModel;
+import forums_db.models.VoteModel;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -13,7 +14,10 @@ import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 
 /**
@@ -38,7 +42,7 @@ public class ThreadService {
         final StringBuilder queryGetParents = new StringBuilder("SELECT p.id FROM post p WHERE p.thread_id = ");
         final StringBuilder queryUpdateForum = new StringBuilder("UPDATE forum f SET posts = posts + ? " +
                 "WHERE f.id = (SELECT t.forum_id FROM thread t WHERE ");
-        final  StringBuilder queryGetPosts = new StringBuilder("SELECT  p.id, u.nickname, p.created, f.slug, " +
+        final StringBuilder queryGetPosts = new StringBuilder("SELECT  p.id, u.nickname, p.created, f.slug, " +
                 "p.is_edited, p.message, p.parent_id, p.thread_id " +
                 "FROM post p JOIN \"user\" u ON (p.user_id = u.id) " +
                 "JOIN forum f ON (p.forum_id = f.id) " +
@@ -71,10 +75,10 @@ public class ThreadService {
             queryGetPosts.append("(SELECT th.id FROM thread th WHERE LOWER(th.slug) = LOWER(?))");
         }
 
-        for (PostModel post: posts) {
-            if(post.getParent() != 0) {
+        for (PostModel post : posts) {
+            if (post.getParent() != 0) {
                 final List<Integer> postsDB = jdbcTemplate.queryForList(queryGetParents.toString(), Integer.class, isNumber ? id : slug);
-                if(!postsDB.contains(post.getParent())) {
+                if (!postsDB.contains(post.getParent())) {
                     throw new DuplicateKeyException(null);
                 }
             }
@@ -91,6 +95,85 @@ public class ThreadService {
 
     }
 
+    public List<ThreadModel> createVote(VoteModel vote, String slug) {
+        final StringBuilder query = new StringBuilder("UPDATE thread SET votes = votes + ? WHERE ");
+        final List<Object> arguments = new ArrayList<>();
+        final Integer id;
+
+        final List<VoteModel> usersVotes = jdbcTemplate.query("SELECT u.nickname, v.voice " +
+                "FROM vote v JOIN \"user\" u ON (v.user_id = u.id) " +
+                "WHERE LOWER(u.nickname) = LOWER(?)", new Object[]{vote.getNickname()}, (rs, rowNum) ->
+                new VoteModel(
+                        rs.getString("nickname"),
+                        rs.getInt("voice")));
+        final Map<String, Integer> usersMap = new LinkedHashMap<>();
+
+        for(VoteModel userVote : usersVotes) {
+            usersMap.put(userVote.getNickname(), userVote.getVoice());
+        }
+
+        if(usersMap.containsKey(vote.getNickname())) {
+
+            if(usersMap.get(vote.getNickname()) < 0 && vote.getVoice() < 0) {
+                vote.setVoice(0);
+            } else if(usersMap.get(vote.getNickname()) < 0 && vote.getVoice() > 0) {
+                vote.setVoice(2);
+            } else if(usersMap.get(vote.getNickname()) > 0 && vote.getVoice() < 0) {
+                vote.setVoice(-2);
+            } else {
+                vote.setVoice(0);
+            }
+            jdbcTemplate.update("UPDATE vote SET voice = voice + ? " +
+                    "WHERE user_id = " +
+                    "(SELECT id FROM \"user\" WHERE LOWER(nickname) = LOWER(?))", vote.getVoice(), vote.getNickname());
+        } else {
+            jdbcTemplate.update("INSERT INTO vote (user_id, voice)" +
+                    "VALUES(" +
+                    "(SELECT id FROM \"user\" u WHERE u.nickname = ?), ?)", vote.getNickname(), vote.getVoice());
+        }
+
+        arguments.add(vote.getVoice());
+
+        try {
+            id = Integer.valueOf(slug);
+
+        } catch (NumberFormatException e) {
+            arguments.add(slug);
+            jdbcTemplate.update(query.append("LOWER(slug) = LOWER(?)").toString(), arguments.toArray());
+            return jdbcTemplate.query("SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title, t.votes " +
+                    "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
+                    "JOIN forum f ON (t.forum_id = f.id) " +
+                    "WHERE LOWER(t.slug) = LOWER(?)", new Object[]{slug}, ThreadService::rowMapper);
+        }
+
+        arguments.add(id);
+        jdbcTemplate.update(query.append("id = ?").toString(), arguments.toArray());
+
+        return jdbcTemplate.query("SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title, t.votes " +
+                "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
+                "JOIN forum f ON (t.forum_id = f.id) " +
+                "WHERE t.id = ?", new Object[]{id}, ThreadService::rowMapper);
+    }
+
+    public List<ThreadModel> getThread(String slug) {
+        final StringBuilder query = new StringBuilder("SELECT t.id, u.nickname, t.created, f.slug fSlug, " +
+                "t.message, t.slug, t.title, t.votes " +
+                "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
+                "JOIN forum f ON (t.forum_id = f.id) WHERE ");
+        final Integer id;
+
+        try {
+            id = Integer.valueOf(slug);
+
+        } catch (NumberFormatException e) {
+            return jdbcTemplate.query(query.append("LOWER(t.slug) = LOWER(?)").toString(),
+                    new Object[]{slug}, ThreadService::rowMapper);
+        }
+
+        return jdbcTemplate.query(query.append("t.id = ?").toString(),
+                new Object[]{id}, ThreadService::rowMapper);
+    }
+
     public static ThreadModel rowMapper(ResultSet set, int rowNumber) throws SQLException {
         final Timestamp timestamp = set.getTimestamp("created");
         final SimpleDateFormat date = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'");
@@ -102,7 +185,8 @@ public class ThreadService {
                 set.getInt("id"),
                 set.getString("message"),
                 set.getString("slug"),
-                set.getString("title")
+                set.getString("title"),
+                set.getInt("votes")
         );
     }
 }

@@ -1,6 +1,8 @@
 package forums_db.controllers;
 
 import forums_db.models.PostModel;
+import forums_db.models.ThreadModel;
+import forums_db.models.VoteModel;
 import forums_db.services.ThreadService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DuplicateKeyException;
@@ -43,6 +45,26 @@ public class ThreadController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
         return ResponseEntity.status(HttpStatus.CREATED).body(posts);
+    }
+
+    @PostMapping(path = "/vote")
+    public ResponseEntity<?> createVote(@RequestBody VoteModel body,
+                                         @PathVariable("slug") String slug) {
+        final List<ThreadModel> threads;
+        try {
+            threads = threadService.createVote(body, slug);
+
+            if(threads.isEmpty()) {
+                throw new EmptyResultDataAccessException(0);
+            }
+
+        } catch (DuplicateKeyException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(threadService.getThread(slug).get(0));
+
+        } catch (EmptyResultDataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+        return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
     }
 
 }
