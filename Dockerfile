@@ -62,5 +62,5 @@ RUN ls /opt/api/target
 #
 # Çàïóñêàåì PostgreSQL è ñåðâåð
 #
-CMD service postgresql start && java -Xmx300M -jar $WORK/api/target/DB_Project-1.0-SNAPSHOT.jar
+CMD service postgresql start && java -Xmx300M -jar $WORK/api/target/technopark_db-1.0-SNAPSHOT.jar
 
