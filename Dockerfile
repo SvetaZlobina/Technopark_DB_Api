@@ -48,10 +48,9 @@ RUN apt-get install -y maven
 
 # Копируем исходный код в Docker-контейнер
 ENV WORK /opt/Technopark_DB_Api
-ADD src/main/ $WORK/src/main/
+ADD api/ $WORK/api/
 
 # Собираем и устанавливаем пакет
-WORKDIR $WORK/src/main
 RUN mvn package
 
 # Объявлем порт сервера
@@ -60,5 +59,5 @@ EXPOSE 5000
 #
 # Запускаем PostgreSQL и сервер
 #
-CMD service postgresql start && java -Xmx300M -Xmx300M -jar $WORK/src/main/target/DB_Project-1.0-SNAPSHOT.jar
+CMD service postgresql start && java -Xmx300M -Xmx300M -jar $WORK/api/target/DB_Project-1.0-SNAPSHOT.jar
 
