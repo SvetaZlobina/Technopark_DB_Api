@@ -47,7 +47,7 @@ RUN apt-get install -y openjdk-8-jdk-headless
 RUN apt-get install -y maven
 
 # Êîïèðóåì èñõîäíûé êîä â Docker-êîíòåéíåð
-ENV WORK /opt/Technopark_DB_Api
+ENV WORK /opt
 ADD . $WORK/api/
 
 # Ñîáèðàåì è óñòàíàâëèâàåì ïàêåò
