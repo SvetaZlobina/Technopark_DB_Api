@@ -48,7 +48,7 @@ RUN apt-get install -y maven
 
 # Êîïèðóåì èñõîäíûé êîä â Docker-êîíòåéíåð
 ENV WORK /opt
-ADD . $WORK/api/
+ADD /api $WORK/api/
 
 # Ñîáèðàåì è óñòàíàâëèâàåì ïàêåò
 WORKDIR $WORK/api
