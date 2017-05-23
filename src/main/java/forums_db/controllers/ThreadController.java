@@ -1,5 +1,6 @@
 package forums_db.controllers;
 
+import forums_db.models.MarkerForPostModel;
 import forums_db.models.PostModel;
 import forums_db.models.ThreadModel;
 import forums_db.models.VoteModel;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -22,6 +24,8 @@ import java.util.List;
 @RequestMapping(path = "api/thread/{slug}")
 public class ThreadController {
     private JdbcTemplate jdbcTemplate;
+
+    private static Integer pageMarker = 0;
 
     @Autowired
     private ThreadService threadService;
@@ -40,11 +44,14 @@ public class ThreadController {
                 throw new EmptyResultDataAccessException(0);
             }
             posts = threadService.createPosts(body, slug);
+
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(null);
-        } catch (EmptyResultDataAccessException e) {
+
+        } catch (DataAccessException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
+
         return ResponseEntity.status(HttpStatus.CREATED).body(posts);
     }
 
@@ -62,7 +69,7 @@ public class ThreadController {
         } catch (DuplicateKeyException e) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(threadService.getThread(slug).get(0));
 
-        } catch (EmptyResultDataAccessException e) {
+        } catch (DataAccessException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
         return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
@@ -84,4 +91,87 @@ public class ThreadController {
         return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
     }
 
+    @PostMapping(path = "/details")
+    public ResponseEntity<?> updateThread(@RequestBody ThreadModel body,
+                                          @PathVariable("slug") String slug) {
+        final List<ThreadModel> threads;
+
+        try {
+            threadService.updateThread(body, slug);
+            threads = threadService.getThread(slug);
+
+            if(threads.isEmpty()) {
+                throw new EmptyResultDataAccessException(0);
+            }
+        } catch (DuplicateKeyException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(threadService.getThread(slug).get(0));
+
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).body(threads.get(0));
+    }
+
+    @GetMapping(path = "/posts")
+    public ResponseEntity<MarkerForPostModel> getPosts(@RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit,
+                                                       @RequestParam(value = "marker", required = false) String marker,
+                                                       @RequestParam(value = "sort", required = false, defaultValue = "flat") String sort,
+                                                       @RequestParam(value = "desc", required = false, defaultValue = "false") Boolean desc,
+                                                       @PathVariable("slug") final String slug) {
+
+
+        final List<PostModel> posts = threadService.getSortedPosts(sort, desc, slug);
+
+        if (posts.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        if (marker != null && !sort.equals("parent_tree")) {
+            pageMarker += limit;
+        }
+
+       if (sort.equals("parent_tree")) {
+
+            if (pageMarker >= posts.size() && marker != null) {
+
+                pageMarker = 0;
+                return ResponseEntity.status(HttpStatus.OK).body(new MarkerForPostModel(marker, new ArrayList<>()));
+
+            } else if (pageMarker == posts.size()){
+                pageMarker = 0;
+            }
+
+            Integer start = 0;
+            Integer number = 0;
+
+            for (PostModel post: posts.subList(pageMarker, posts.size())) {
+
+                if(start.equals(limit) && desc == Boolean.TRUE) {
+                    break;
+
+                } else if (start.equals(limit+1) && (desc == null || desc == Boolean.FALSE)) {
+                    number--;
+                    break;
+                }
+
+                start += post.getParent().equals(0) ? 1 : 0;
+                number++;
+            }
+
+            return ResponseEntity.status(HttpStatus.OK).body(new MarkerForPostModel(
+                    marker, posts.subList(pageMarker, pageMarker+=number)));
+       }
+
+       if (pageMarker > posts.size()) {
+            pageMarker = 0;
+
+            return ResponseEntity.status(HttpStatus.OK).body(new MarkerForPostModel(marker, new ArrayList<>()));
+       } else if (pageMarker == posts.size()) {
+            pageMarker = 0;
+       }
+
+        return ResponseEntity.status(HttpStatus.OK).body(new MarkerForPostModel(marker,
+                posts.subList(pageMarker, limit + pageMarker > posts.size() ? posts.size() : limit + pageMarker)));
+    }
 }

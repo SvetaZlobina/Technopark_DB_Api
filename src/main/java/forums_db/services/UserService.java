@@ -38,7 +38,7 @@ public class UserService {
         jdbcTemplate.update(query, new Object[]{user.getAbout(), user.getEmail(), user.getFullname(), user.getNickname()});
     }
 
-    private static UserModel rowMapper(ResultSet set, int rowNumber) throws SQLException {
+    public static UserModel rowMapper(ResultSet set, int rowNumber) throws SQLException {
         return new UserModel(
                 set.getString("about"),
                 set.getString("email"),

@@ -2,6 +2,7 @@ package forums_db.controllers;
 
 import forums_db.models.ForumModel;
 import forums_db.models.ThreadModel;
+import forums_db.models.UserModel;
 import forums_db.services.ForumService;
 import forums_db.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -101,6 +102,7 @@ public class ForumController {
             @RequestParam(value = "since", required = false) String since,
             @RequestParam(value = "desc", required = false) Boolean desc,
             @PathVariable("slug") String slug) {
+
         try {
             final List<ForumModel> forums = forumService.getForum(slug);
             if (forums.isEmpty()) {
@@ -110,5 +112,27 @@ public class ForumController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
         return ResponseEntity.status(HttpStatus.OK).body(forumService.getThreads(slug, limit, since, desc));
+    }
+
+    @GetMapping(path = "/{slug}/users")
+    public ResponseEntity<?> getUsers(@RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit,
+                                      @RequestParam(value = "since", required = false) String since,
+                                      @RequestParam(value = "desc", required = false) Boolean desc,
+                                      @PathVariable("slug") String slug) {
+
+        final List<UserModel> users;
+
+        try {
+            users = forumService.getUsers(slug, limit, since, desc);
+            final List<ForumModel> forums = forumService.getForum(slug);
+
+            if(forums.isEmpty()) {
+                throw new EmptyResultDataAccessException(0);
+            }
+        } catch (DataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        }
+
+        return ResponseEntity.status(HttpStatus.OK).body(users);
     }
 }

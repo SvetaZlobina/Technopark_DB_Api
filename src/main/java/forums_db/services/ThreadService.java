@@ -87,11 +87,15 @@ public class ThreadService {
                     post.getIsEdited(), post.getMessage(), post.getParent(), isNumber ? id : slug);
         }
 
+        queryGetPosts.append(" ORDER BY p.id");
+
         jdbcTemplate.update(queryUpdateForum.toString(), posts.size(), isNumber ? id : slug);
 
         final List<PostModel> postsDB = jdbcTemplate.query(queryGetPosts.toString(),
                 isNumber ? new Object[]{id} : new Object[]{slug}, PostService::rowMapper);
-        return postsDB;
+        final Integer startIndex = postsDB.size() - posts.size();
+        final Integer endIndex = postsDB.size();
+        return postsDB.subList(startIndex, endIndex);
 
     }
 
@@ -172,6 +176,113 @@ public class ThreadService {
 
         return jdbcTemplate.query(query.append("t.id = ?").toString(),
                 new Object[]{id}, ThreadService::rowMapper);
+    }
+
+    public void updateThread(ThreadModel thread, String slug) {
+        final StringBuilder query = new StringBuilder("UPDATE thread SET");
+        final List<Object> arguments = new ArrayList<>();
+
+        if(thread.getMessage() != null && !thread.getMessage().isEmpty()) {
+            query.append(" message = ?,");
+            arguments.add(thread.getMessage());
+        }
+        if(thread.getTitle() != null && !thread.getTitle().isEmpty()) {
+            query.append(" title = ?,");
+            arguments.add(thread.getTitle());
+        }
+        if(arguments.isEmpty()) {
+            return;
+        }
+
+        query.delete(query.length()-1, query.length());
+        final Integer id;
+         try {
+             id = Integer.valueOf(slug);
+             query.append(" WHERE  id = ?");
+             arguments.add(id);
+
+         } catch (NumberFormatException e) {
+             query.append(" WHERE LOWER(slug) = LOWER(?)");
+             arguments.add(slug);
+         }
+
+         jdbcTemplate.update(query.toString(), arguments.toArray());
+    }
+
+    public List<PostModel> getSortedPosts(String sort, Boolean desc, String slug) {
+
+        final String template = " tree AS " +
+                "(SELECT *, array[id] AS path FROM got_threads WHERE parent_id = 0 " +
+                "UNION SELECT g.*, tree.path || g.id AS path FROM tree JOIN got_threads g ON (g.parent_id = tree.id)) " +
+                "SELECT * FROM tree ORDER BY path"; //TODO дописать
+        final StringBuilder query = new StringBuilder();
+        Integer id = null;
+        Boolean isNumber = false;
+
+        try {
+            final String queryTemplate = "SELECT p.id, u.nickname, p.created, f.slug, p.is_edited, p.message, p.parent_id, p.thread_id " +
+                    "FROM post p JOIN \"user\" u ON (p.user_id = u.id) " +
+                    "JOIN thread t ON(p.thread_id = t.id) JOIN forum f ON(p.forum_id = f.id) " +
+                    "WHERE t.id = ?";
+            id = Integer.valueOf(slug);
+            isNumber = Boolean.TRUE;
+
+            if (sort.equals("flat")) {
+                query.append(queryTemplate + " ORDER BY p.created");
+
+            } else {
+                query.append("WITH RECURSIVE got_threads AS (" + queryTemplate + "), " + template);
+            }
+        } catch (NumberFormatException e ) {
+            final String queryTemplate = "SELECT p.id, u.nickname, p.created, f.slug, p.is_edited, p.message, p.parent_id, p.thread_id " +
+                    "FROM post p JOIN \"user\" u ON (p.user_id = u.id) " +
+                    "JOIN thread t ON(p.thread_id = t.id) JOIN forum f ON(p.forum_id = f.id) " +
+                    "WHERE LOWER(t.slug) = LOWER(?) ";
+
+            if (sort.equals("flat")) {
+                query.append(queryTemplate + " ORDER BY p.created");
+
+            } else {
+                query.append("WITH RECURSIVE got_threads AS (" + queryTemplate + "), " + template);
+            }
+        }
+
+        if (desc == Boolean.TRUE) {
+            query.append(" DESC");
+        }
+
+        if (sort.equals("flat")) {
+            query.append(", p.id");
+
+            if (desc == Boolean.TRUE) {
+                query.append(" DESC");
+            }
+        }
+
+        return jdbcTemplate.query(query.toString(),
+                isNumber ? new Object[]{id} : new Object[]{slug},
+                PostService::rowMapper);
+        //Integer id = slug.matches("\\d+") ? Integer.valueOf(slug) : null;
+
+
+
+        /*switch(sort) {
+            case "flat": {
+                return jdbcTemplate.query(QueriesForThreadService.postsFlatSort(slug, desc),
+                        new Object[]{id == null ? slug : id, limit, offset}, PostService::rowMapper);
+            }
+//            case "tree": {
+//                return jdbcTemplate.query(QueriesForThreadService.postsTreeSort(slug, desc),
+//                        new Object[]{id == null ? slug : id, limit, offset}, PostService::rowMapper);
+//            }
+//            case "parent_tree": {
+//                return jdbcTemplate.query(QueriesForThreadService.postsParentTreeSort(slug, desc),
+//                        new Object[]{id == null ? slug : id, limit, offset}, PostService::rowMapper);
+//            }
+            default: {
+                throw new NullPointerException();
+            }
+        }*/
     }
 
     public static ThreadModel rowMapper(ResultSet set, int rowNumber) throws SQLException {

@@ -2,6 +2,7 @@ package forums_db.services;
 
 import forums_db.models.ForumModel;
 import forums_db.models.ThreadModel;
+import forums_db.models.UserModel;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -32,7 +33,7 @@ public class ForumService {
 
     public List<ForumModel> getForum(String slug) {
         final String query =
-                "SELECT posts, slug, threads, title, u.nickname " +
+                "SELECT posts, slug, threads, threads, title, u.nickname " +
                         "FROM forum f JOIN \"user\" u ON f.user_id = u.id " +
                         "WHERE LOWER(slug) = LOWER(?)";
         return jdbcTemplate.query(query, new Object[]{slug}, ForumService::rowMapper);
@@ -54,6 +55,9 @@ public class ForumService {
                 "?, ?, ?)";
         jdbcTemplate.update(query, thread.getAuthor(), timestamp, thread.getForum(),
                 thread.getMessage(), thread.getSlug(), thread.getTitle());
+
+        jdbcTemplate.update("UPDATE forum SET threads = threads + 1 WHERE LOWER(slug) = LOWER(?)",
+                thread.getForum());
 
         return jdbcTemplate.query(
                 "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.title, t.slug, t.votes " +
@@ -101,6 +105,45 @@ public class ForumService {
                         "JOIN forum f ON (t.forum_id = f.id) " +
                         "WHERE LOWER(t.slug) = LOWER(?)";
         return jdbcTemplate.query(query, new Object[]{slug}, ThreadService::rowMapper);
+    }
+
+    public List<UserModel> getUsers(String slug, Integer limit, String since, Boolean desc) {
+        final StringBuilder query = new StringBuilder("SELECT u3.id, u3.about, u3.email, u3.nickname, u3.fullname " +
+                "FROM \"user\" u3 WHERE u3.id IN " +
+                "(SELECT u1.id FROM thread t1 JOIN \"user\" u1 ON (t1.user_id = u1.id) JOIN forum f1 ON (t1.forum_id = f1.id) " +
+                "WHERE LOWER(f1.slug) = LOWER(?) " +
+                "UNION " +
+                "SELECT u2.id FROM post p2 JOIN \"user\" u2 ON (p2.user_id = u2.id) JOIN forum f2 ON (p2.forum_id = f2.id) " +
+                "WHERE LOWER(f2.slug) = LOWER(?))");
+
+        final List<Object> arguments = new ArrayList<>();
+        arguments.add(slug);
+        arguments.add(slug);
+
+        if (since != null) {
+            query.append(" AND LOWER(u3.nickname) ");
+
+            if (desc == Boolean.TRUE) {
+                query.append("< LOWER(?)");
+
+            } else {
+                query.append("> LOWER(?)");
+            }
+            //System.out.println(since);
+            arguments.add(since);
+        }
+
+        query.append(" ORDER BY LOWER(u3.nickname)");
+
+        if (desc == Boolean.TRUE) {
+            query.append(" DESC");
+        }
+
+        query.append(" LIMIT ?");
+        arguments.add(limit);
+
+        return jdbcTemplate.query(query.toString(), arguments.toArray(new Object[arguments.size()]), UserService::rowMapper);
+
     }
 
 
