@@ -2,11 +2,11 @@ FROM ubuntu:16.04
 
 MAINTAINER Svetlana V. Zlobina
 
-# Обвновление списка пакетов
+# ГЋГЎГўГ­Г®ГўГ«ГҐГ­ГЁГҐ Г±ГЇГЁГ±ГЄГ  ГЇГ ГЄГҐГІГ®Гў
 RUN apt-get -y update
 
 #
-# Установка postgresql
+# Г“Г±ГІГ Г­Г®ГўГЄГ  postgresql
 #
 ENV PGVER 9.5
 RUN apt-get install -y postgresql-$PGVER
@@ -39,25 +39,26 @@ VOLUME  ["/etc/postgresql", "/var/log/postgresql", "/var/lib/postgresql"]
 USER root
 
 #
-# Сборка проекта
+# Г‘ГЎГ®Г°ГЄГ  ГЇГ°Г®ГҐГЄГІГ 
 #
 
-# Установка JDK
+# Г“Г±ГІГ Г­Г®ГўГЄГ  JDK
 RUN apt-get install -y openjdk-8-jdk-headless
 RUN apt-get install -y maven
 
-# Копируем исходный код в Docker-контейнер
+# ГЉГ®ГЇГЁГ°ГіГҐГ¬ ГЁГ±ГµГ®Г¤Г­Г»Г© ГЄГ®Г¤ Гў Docker-ГЄГ®Г­ГІГҐГ©Г­ГҐГ°
 ENV WORK /opt/Technopark_DB_Api
 ADD api/ $WORK/api/
 
-# Собираем и устанавливаем пакет
+# Г‘Г®ГЎГЁГ°Г ГҐГ¬ ГЁ ГіГ±ГІГ Г­Г ГўГ«ГЁГўГ ГҐГ¬ ГЇГ ГЄГҐГІ
+WORKDIR $WORK/api
 RUN mvn package
 
-# Объявлем порт сервера
+# ГЋГЎГєГїГўГ«ГҐГ¬ ГЇГ®Г°ГІ Г±ГҐГ°ГўГҐГ°Г 
 EXPOSE 5000
 
 #
-# Запускаем PostgreSQL и сервер
+# Г‡Г ГЇГіГ±ГЄГ ГҐГ¬ PostgreSQL ГЁ Г±ГҐГ°ГўГҐГ°
 #
 CMD service postgresql start && java -Xmx300M -Xmx300M -jar $WORK/api/target/DB_Project-1.0-SNAPSHOT.jar
 
