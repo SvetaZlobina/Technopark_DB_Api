@@ -60,5 +60,5 @@ EXPOSE 5000
 #
 # Çàïóñêàåì PostgreSQL è ñåðâåð
 #
-CMD service postgresql start && java -Xmx300M -jar $WORKDIR/api/target/DB_Project-1.0-SNAPSHOT.jar
+CMD service postgresql start && java -Xmx300M -jar $WORK/api/target/DB_Project-1.0-SNAPSHOT.jar
 
