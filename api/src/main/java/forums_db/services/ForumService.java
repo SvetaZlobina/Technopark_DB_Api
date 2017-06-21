@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Created by SvetaZlobina on 21.03.2017.
@@ -20,6 +21,9 @@ import java.util.List;
 @Service
 public class ForumService {
     private JdbcTemplate jdbcTemplate;
+    private static Integer currentThreadId = 0;
+
+    private static Logger log = Logger.getLogger(ForumService.class.getName());
 
     public ForumService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -41,10 +45,19 @@ public class ForumService {
 
     public List<ThreadModel> createThread(ThreadModel thread) {
 
+        currentThreadId++;
+        //log.info("CurrentTreadId: " + currentThreadId);
+
         Timestamp timestamp = Timestamp.valueOf(LocalDateTime.parse(thread.getCreated(), DateTimeFormatter.ISO_DATE_TIME));
 
         if (!thread.getCreated().endsWith("Z")) {
             timestamp = Timestamp.from(timestamp.toInstant().plusSeconds(-10800));
+        }
+
+        Boolean hasSlug = Boolean.TRUE;
+
+        if (thread.getSlug() == null) {
+            hasSlug = Boolean.FALSE;
         }
 
         final String query = "INSERT INTO thread(user_id, created, forum_id, \"message\", slug, title) " +
@@ -52,19 +65,38 @@ public class ForumService {
                 "(SELECT id FROM \"user\" WHERE LOWER(nickname) = LOWER(?)), " +
                 "?, " +
                 "(SELECT id FROM forum WHERE LOWER(slug) = LOWER(?)), " +
-                "?, ?, ?)";
-        jdbcTemplate.update(query, thread.getAuthor(), timestamp, thread.getForum(),
-                thread.getMessage(), thread.getSlug(), thread.getTitle());
+                "?, ?, ?) RETURNING thread.id";
+        final Integer threadId = jdbcTemplate.queryForObject(query, new Object[]{thread.getAuthor(), timestamp, thread.getForum(),
+                thread.getMessage(), hasSlug ? thread.getSlug() : null, thread.getTitle()}, Integer.class);
 
-        jdbcTemplate.update("UPDATE forum SET threads = threads + 1 WHERE LOWER(slug) = LOWER(?)",
-                thread.getForum());
 
-        return jdbcTemplate.query(
-                "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.title, t.slug, t.votes " +
-                        "FROM thread t JOIN \"user\" u ON (t.user_id = u.id) JOIN forum f ON (t.forum_id = f.id) " +
-                        "WHERE LOWER(t.slug) = LOWER(?)",
-                new Object[]{thread.getSlug()},
-                ThreadService::rowMapper);
+
+        if (hasSlug)
+        {
+            jdbcTemplate.update("UPDATE forum SET threads = threads + 1 WHERE LOWER(slug) = LOWER(?)",
+                    thread.getForum());
+
+            return jdbcTemplate.query(
+                    "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.title, t.slug, t.votes " +
+                            "FROM thread t JOIN \"user\" u ON (t.user_id = u.id) JOIN forum f ON (t.forum_id = f.id) " +
+                            "WHERE LOWER(t.slug) = LOWER(?)",
+                    new Object[]{thread.getSlug()},
+                    ThreadService::rowMapper);
+
+        } else {
+            jdbcTemplate.update("UPDATE forum SET threads = threads + 1 WHERE id = ?",
+                    threadId);
+
+            log.info("ThreadId before query: " + threadId);
+            return jdbcTemplate.query(
+                    "SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.title, t.slug, t.votes " +
+                            "FROM thread t JOIN \"user\" u ON (t.user_id = u.id) JOIN forum f ON (t.forum_id = f.id) " +
+                            "WHERE t.id = ?",
+                    new Object[]{/*currentThreadId*/threadId},
+                    ThreadService::rowMapper);
+        }
+
+
     }
 
     public List<ThreadModel> getThreads(String slug, Integer limit, String since, Boolean desc) {

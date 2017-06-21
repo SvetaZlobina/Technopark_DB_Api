@@ -4,8 +4,6 @@ import forums_db.models.ForumModel;
 import forums_db.models.ThreadModel;
 import forums_db.models.UserModel;
 import forums_db.services.ForumService;
-import forums_db.services.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -16,6 +14,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 //import java.sql.Timestamp;
 
 /**
@@ -24,13 +24,12 @@ import java.util.List;
 @RestController
 @RequestMapping(path = "api/forum")
 public class ForumController {
+    private static Logger log = Logger.getLogger(ForumController.class.getName());
+    //@Autowired
     private JdbcTemplate jdbcTemplate;
 
-    @Autowired
+    //@Autowired
     private ForumService forumService;
-
-    @Autowired
-    private UserService userService;
 
     public ForumController(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -57,7 +56,8 @@ public class ForumController {
     public ResponseEntity<?> createThread(@RequestBody ThreadModel body,
                                           @PathVariable("slug") String slug) {
         if (body.getSlug() == null) {
-            body.setSlug(slug);
+            //body.setSlug(slug);
+            log.warning("Thread has no slug");
         }
         if (body.getForum() == null) {
             body.setForum(slug);
@@ -76,11 +76,14 @@ public class ForumController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(forumService.getThread(body.getSlug()).get(0));
 
         } catch (DataAccessException e) {
+            log.log(Level.WARNING, "DataAccessException: ", e);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
         }
 
-        if (threads.get(0).getSlug().equals(threads.get(0).getForum())) {
-            threads.get(0).setSlug(null);
+        if (threads.get(0).getSlug() != null) {
+            if (threads.get(0).getSlug().equals(threads.get(0).getForum())) {
+                threads.get(0).setSlug(null);
+            }
         }
 
         return ResponseEntity.status(HttpStatus.CREATED).body(threads.get(0));

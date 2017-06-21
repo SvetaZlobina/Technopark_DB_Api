@@ -15,9 +15,9 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Logger;
 
 /**
@@ -26,6 +26,7 @@ import java.util.logging.Logger;
 @Service
 public class ThreadService {
     private JdbcTemplate jdbcTemplate;
+
 
     public ThreadService(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
@@ -102,7 +103,9 @@ public class ThreadService {
     public List<ThreadModel> createVote(VoteModel vote, String slug) {
         final StringBuilder query = new StringBuilder("UPDATE thread SET votes = votes + ? WHERE ");
         final List<Object> arguments = new ArrayList<>();
-        final Integer id;
+        Integer id = 0;
+
+        log.info("Voice: " + vote.getVoice());
 
         final List<VoteModel> usersVotes = jdbcTemplate.query("SELECT u.nickname, v.voice " +
                 "FROM vote v JOIN \"user\" u ON (v.user_id = u.id) " +
@@ -110,7 +113,7 @@ public class ThreadService {
                 new VoteModel(
                         rs.getString("nickname"),
                         rs.getInt("voice")));
-        final Map<String, Integer> usersMap = new LinkedHashMap<>();
+        final Map<String, Integer> usersMap = new ConcurrentHashMap<>();
 
         for(VoteModel userVote : usersVotes) {
             usersMap.put(userVote.getNickname(), userVote.getVoice());
@@ -214,7 +217,7 @@ public class ThreadService {
         final String template = " tree AS " +
                 "(SELECT *, array[id] AS path FROM got_threads WHERE parent_id = 0 " +
                 "UNION SELECT g.*, tree.path || g.id AS path FROM tree JOIN got_threads g ON (g.parent_id = tree.id)) " +
-                "SELECT * FROM tree ORDER BY path"; //TODO дописать
+                "SELECT * FROM tree ORDER BY path";
         final StringBuilder query = new StringBuilder();
         Integer id = null;
         Boolean isNumber = false;
