@@ -104,15 +104,44 @@ public class ThreadService {
         final StringBuilder query = new StringBuilder("UPDATE thread SET votes = votes + ? WHERE ");
         final List<Object> arguments = new ArrayList<>();
         Integer id = 0;
+        String slugIfHas = "";
 
-        log.info("Voice: " + vote.getVoice());
+        try {
+            id = Integer.valueOf(slug);
 
-        final List<VoteModel> usersVotes = jdbcTemplate.query("SELECT u.nickname, v.voice " +
-                "FROM vote v JOIN \"user\" u ON (v.user_id = u.id) " +
-                "WHERE LOWER(u.nickname) = LOWER(?)", new Object[]{vote.getNickname()}, (rs, rowNum) ->
-                new VoteModel(
-                        rs.getString("nickname"),
-                        rs.getInt("voice")));
+
+        } catch (NumberFormatException e) {
+            id = 0;
+            slugIfHas = slug;
+        }
+
+        final Integer voiceBefore = vote.getVoice();
+
+        //log.info("Voice: " + vote.getVoice() + " Thread: " + slug);
+
+        List<VoteModel> usersVotes;
+
+        if(!id.equals(0)) {
+            usersVotes = jdbcTemplate.query("SELECT u.nickname, v.voice " +
+                    "FROM vote v JOIN \"user\" u ON (v.user_id = u.id) " +
+                    "JOIN thread t ON (t.id) = (v.thread_id) " +
+                    "WHERE LOWER(u.nickname) = LOWER(?) AND t.id = ?", new Object[]{vote.getNickname(), id}, (rs, rowNum) ->
+                    new VoteModel(
+                            rs.getString("nickname"),
+                            rs.getInt("voice")));
+
+        } else {
+
+            usersVotes = jdbcTemplate.query("SELECT u.nickname, v.voice " +
+                    "FROM vote v JOIN \"user\" u ON (v.user_id = u.id) " +
+                    "JOIN thread t ON (t.id) = (v.thread_id) " +
+                    "WHERE LOWER(u.nickname) = LOWER(?) AND LOWER(t.slug) = LOWER(?)", new Object[]{vote.getNickname(), slugIfHas}, (rs, rowNum) ->
+                    new VoteModel(
+                            rs.getString("nickname"),
+                            rs.getInt("voice")));
+        }
+
+
         final Map<String, Integer> usersMap = new ConcurrentHashMap<>();
 
         for(VoteModel userVote : usersVotes) {
@@ -133,13 +162,29 @@ public class ThreadService {
             jdbcTemplate.update("UPDATE vote SET voice = voice + ? " +
                     "WHERE user_id = " +
                     "(SELECT id FROM \"user\" WHERE LOWER(nickname) = LOWER(?))", vote.getVoice(), vote.getNickname());
-        } else {
-            jdbcTemplate.update("INSERT INTO vote (user_id, voice)" +
+
+            log.info("Voice to update before: " + voiceBefore + " after: " + vote.getVoice() + " author: " + vote.getNickname() + " Thread: " + id);
+        } else if(!id.equals(0)){
+            jdbcTemplate.update("INSERT INTO vote (user_id, voice, thread_id)" +
                     "VALUES(" +
-                    "(SELECT id FROM \"user\" u WHERE u.nickname = ?), ?)", vote.getNickname(), vote.getVoice());
+                    "(SELECT id FROM \"user\" u WHERE u.nickname = ?), ?, ?)", vote.getNickname(), vote.getVoice(), id);
+
+            log.info("New voice: " + vote.getVoice() + " author: " + vote.getNickname() + " Thread: " + id);
+
+        } else {
+
+            jdbcTemplate.update("INSERT INTO vote (user_id, voice, thread_id)" +
+                    "VALUES(" +
+                    "(SELECT id FROM \"user\" u WHERE u.nickname = ?), ?, " +
+                    "(SELECT id FROM thread t WHERE LOWER(t.slug) = LOWER(?)))", vote.getNickname(), vote.getVoice(), slugIfHas);
+
+            log.info("New voice: " + vote.getVoice() + " author: " + vote.getNickname() + " Thread: " + slugIfHas);
+
         }
 
         arguments.add(vote.getVoice());
+        //log.info("Voice before: " + voiceBefore + "Voice after: " + vote.getVoice() + " Thread: " + slug);
+
 
         try {
             id = Integer.valueOf(slug);
@@ -147,6 +192,9 @@ public class ThreadService {
         } catch (NumberFormatException e) {
             arguments.add(slug);
             jdbcTemplate.update(query.append("LOWER(slug) = LOWER(?)").toString(), arguments.toArray());
+
+            //log.info("votes updated where slug = " + slug);
+
             return jdbcTemplate.query("SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title, t.votes " +
                     "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
                     "JOIN forum f ON (t.forum_id = f.id) " +
@@ -156,6 +204,7 @@ public class ThreadService {
         arguments.add(id);
         jdbcTemplate.update(query.append("id = ?").toString(), arguments.toArray());
 
+        //log.info("votes updated where id = " + slug);
         return jdbcTemplate.query("SELECT t.id, u.nickname, t.created, f.slug fSlug, t.message, t.slug, t.title, t.votes " +
                 "FROM thread t JOIN \"user\"  u ON (t.user_id = u.id) " +
                 "JOIN forum f ON (t.forum_id = f.id) " +
